@@ -283,3 +283,5 @@ temp_ppo_checkpoints
 tmp_ckpt*
 
 .vscode
+
+/SPO-experiments/

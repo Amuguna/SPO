@@ -13,7 +13,7 @@ local question_template = prompt_library.prompt_library.tree.question_template;
             swap_space: 16,
         },
 
-        append_bos_to_query: true,
+        append_bos_to_query: false,
         append_eos_to_response: true,
 
         dataset_shuffle_on_each_iteration: true,
