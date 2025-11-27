@@ -38,10 +38,13 @@ local sampling_temperature = 0.6;
 
     vllm_server+: {
       swap_space: 32,
+      max_num_seqs: 128,
       enable_prefix_caching: true,
     },
+    vllm_min_available_gpu_memory_mb: 4 * 1024,
+    vllm_gpu_memory_utilization: 0.4,
 
-    max_sequence_length: 2048,
+    max_sequence_length: null,
 
     save_generations_every_n_iteration: 50,
 
@@ -83,6 +86,7 @@ local sampling_temperature = 0.6;
       no_cache: true,
     },
 
+    question_sampler: (import 'question_sampler/random.jsonnet'),  // Not used
   },
 
   tokenizer: actor_tokenizer,
@@ -107,8 +111,8 @@ local sampling_temperature = 0.6;
 
     general_training_args+: {
       target_train_batch_size: 64,
-      per_device_train_batch_size: 2,
-      per_device_eval_batch_size: 4,
+      per_device_train_batch_size: 4,
+      per_device_eval_batch_size: 8,
       gradient_accumulation_steps: null,
       save_steps: 10,
       checkpoint_keep_steps: 40,

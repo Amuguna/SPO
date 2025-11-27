@@ -90,12 +90,46 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         #####################################################################################
         # Estimate the value of each state in the trajectories using Monte Carlo rollouts
         #####################################################################################
+        # First, kill vLLM server to free GPU memory for actor forward pass
+        kill_vllm_server()
+        release_memory()
+        vllm_cleanup_fn()
+        release_memory()
+        
+        # Wait for all processes to finish killing vLLM and for GPU memory to be released
+        self.distributed_state.wait_for_everyone()
+        
+        # Extra safety: kill any remaining vLLM processes on this node (only main process does this)
+        if self.distributed_state.is_local_main_process:
+            import subprocess
+            try:
+                # Kill all vLLM API server processes
+                subprocess.run(["pkill", "-f", "-9", "vllm.entrypoints.openai.api_server"], 
+                             capture_output=True, timeout=10)
+                logger.info("Killed all remaining vLLM processes on this node")
+            except Exception as e:
+                logger.warning(f"Error killing vLLM processes: {e}")
+        
+        self.distributed_state.wait_for_everyone()
+        
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        
+        # Additional wait to ensure GPU memory is fully released
+        import time as time_module
+        time_module.sleep(5)
+        logger.info("vLLM server killed before actor forward pass, GPU memory cleared")
+
         (
             unique_requests,
             all_requests,
             all_reqs_to_unique_key,
             trajectories,
         ) = self._create_value_estimation_requests(trajectories, results_root_dir, iteration)
+        
+        # Now restart vLLM server for value estimation
         val_est_result_path = (
             results_root_dir.parent / "unique_value_estimation_result_ds"
         )

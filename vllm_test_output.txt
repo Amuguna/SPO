@@ -1,0 +1,127 @@
+============================================================
+Testing vLLM Server Lifecycle
+============================================================
+
+[1] Initial GPU state:
+1529183, 24350 MiB, [Not Found]
+
+[1] Initial vLLM processes:
+279543 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 45213 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+
+[2] Creating vLLM server...
+
+[3] Starting vLLM server (this may take a minute)...
+[INFO|vllm_server.py:243:281764] 2025-11-27 04:53:50,519 >> Server started with PID 281768 on port 49293
+INFO 11-27 04:53:52 api_server.py:149] vLLM API server version 0.4.0.post1
+INFO 11-27 04:53:52 api_server.py:150] args: Namespace(host='0.0.0.0', port=49293, uvicorn_log_level='info', allow_credentials=False, allowed_origins=['*'], allowed_methods=['*'], allowed_headers=['*'], api_key=None, served_model_name=None, lora_modules=None, chat_template=None, response_role='assistant', ssl_keyfile=None, ssl_certfile=None, ssl_ca_certs=None, ssl_cert_reqs=0, root_path=None, middleware=[], model='Qwen/Qwen2.5-Math-7B', tokenizer=None, revision=None, code_revision=None, tokenizer_revision=None, tokenizer_mode='auto', trust_remote_code=False, download_dir=None, load_format='auto', dtype='bfloat16', kv_cache_dtype='auto', max_model_len=None, worker_use_ray=False, pipeline_parallel_size=1, tensor_parallel_size=1, max_parallel_loading_workers=None, ray_workers_use_nsight=False, block_size=16, enable_prefix_caching=False, use_v2_block_manager=False, num_lookahead_slots=0, seed=42, swap_space=4, gpu_memory_utilization=0.3, forced_num_gpu_blocks=None, max_num_batched_tokens=None, max_num_seqs=16, max_logprobs=5, disable_log_stats=False, quantization=None, enforce_eager=False, max_context_len_to_capture=8192, disable_custom_all_reduce=False, tokenizer_pool_size=0, tokenizer_pool_type='ray', tokenizer_pool_extra_config=None, enable_lora=False, max_loras=1, max_lora_rank=16, lora_extra_vocab_size=256, lora_dtype='auto', max_cpu_loras=None, device='auto', image_input_type=None, image_token_id=None, image_input_shape=None, image_feature_size=None, scheduler_delay_factor=0.0, enable_chunked_prefill=False, engine_use_ray=False, disable_log_requests=False, max_log_len=None)
+/venv/vineppo/lib/python3.10/site-packages/huggingface_hub/file_download.py:942: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+INFO 11-27 04:53:53 llm_engine.py:74] Initializing an LLM engine (v0.4.0.post1) with config: model='Qwen/Qwen2.5-Math-7B', tokenizer='Qwen/Qwen2.5-Math-7B', tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=4096, download_dir=None, load_format=auto, tensor_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto, device_config=cuda, seed=42)
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+INFO 11-27 04:53:54 selector.py:16] Using FlashAttention backend.
+INFO 11-27 04:53:55 weight_utils.py:177] Using model weights format ['*.safetensors']
+INFO 11-27 04:53:58 model_runner.py:104] Loading model weights took 14.2418 GB
+INFO 11-27 04:53:58 gpu_executor.py:94] # GPU blocks: 9933, # CPU blocks: 4681
+INFO 11-27 04:54:00 model_runner.py:791] Capturing the model for CUDA graphs. This may lead to unexpected consequences if the model is not static. To run the model in eager mode, set 'enforce_eager=True' or use '--enforce-eager' in the CLI.
+INFO 11-27 04:54:00 model_runner.py:795] CUDA graphs can take additional 1~3 GiB memory per GPU. If you are running out of memory, consider decreasing `gpu_memory_utilization` or enforcing eager mode. You can also reduce the `max_num_seqs` as needed to decrease memory usage.
+INFO 11-27 04:54:01 model_runner.py:867] Graph capturing finished in 1 secs.
+/venv/vineppo/lib/python3.10/site-packages/huggingface_hub/file_download.py:942: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+INFO 11-27 04:54:02 serving_chat.py:331] Using default chat template:
+INFO 11-27 04:54:02 serving_chat.py:331] {%- if tools %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {{- '<|im_start|>system\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- if messages[0]['role'] == 'system' %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- messages[0]['content'] }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- else %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- 'Please reason step by step, and put your final answer within \\boxed{}.' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {{- "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>" }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- for tool in tools %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- "\n" }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- tool | tojson }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- endfor %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {{- "\n</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- else %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- if messages[0]['role'] == 'system' %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '<|im_start|>system\n' + messages[0]['content'] + '<|im_end|>\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- else %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '<|im_start|>system\nPlease reason step by step, and put your final answer within \\boxed{}.<|im_end|>\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- for message in messages %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- if (message.role == "user") or (message.role == "system" and not loop.first) or (message.role == "assistant" and not message.tool_calls) %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '<|im_start|>' + message.role + '\n' + message.content + '<|im_end|>' + '\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- elif message.role == "assistant" %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '<|im_start|>' + message.role }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- if message.content %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '\n' + message.content }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- for tool_call in message.tool_calls %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {%- if tool_call.function is defined %}
+INFO 11-27 04:54:02 serving_chat.py:331]                 {%- set tool_call = tool_call.function %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '\n<tool_call>\n{"name": "' }}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- tool_call.name }}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '", "arguments": ' }}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- tool_call.arguments | tojson }}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '}\n</tool_call>' }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- endfor %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '<|im_end|>\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- elif message.role == "tool" %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- if (loop.index0 == 0) or (messages[loop.index0 - 1].role != "tool") %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '<|im_start|>user' }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '\n<tool_response>\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- message.content }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {{- '\n</tool_response>' }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- if loop.last or (messages[loop.index0 + 1].role != "tool") %}
+INFO 11-27 04:54:02 serving_chat.py:331]             {{- '<|im_end|>\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331]         {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- endfor %}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- if add_generation_prompt %}
+INFO 11-27 04:54:02 serving_chat.py:331]     {{- '<|im_start|>assistant\n' }}
+INFO 11-27 04:54:02 serving_chat.py:331] {%- endif %}
+INFO 11-27 04:54:02 serving_chat.py:331] 
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+INFO:     Started server process [281773]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:49293 (Press CTRL+C to quit)
+/venv/vineppo/lib/python3.10/site-packages/pydantic/main.py:292: UserWarning: Pydantic serializer warnings:
+  Expected `str` but got `bool` - serialized value may not be as expected
+  return self.__pydantic_serializer__.to_python(
+INFO:     127.0.0.1:34558 - "GET /v1/models HTTP/1.1" 200 OK
+[INFO|vllm_server.py:188:281764] 2025-11-27 04:54:02,552 >> Server is up and responding.
+  Server started at: http://localhost:49293/v1
+  Server PID: 281768
+  Server port: 49293
+
+[4] GPU state after starting:
+1529183, 24350 MiB, [Not Found]
+1534249, 24350 MiB, [Not Found]
+
+[4] vLLM processes after starting:
+279543 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 45213 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+281773 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 49293 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+
+[5] Waiting 5 seconds...
+
+[6] Stopping vLLM server...
+[INFO|vllm_server.py:292:281764] 2025-11-27 04:54:07,730 >> Stopping vLLM server with PID 281768 on port 49293
+[INFO|vllm_server.py:341:281764] 2025-11-27 04:54:15,750 >> vLLM server stopped on port 49293
+
+[7] Waiting 10 seconds for cleanup...
+
+[8] GPU state after stopping:
+1529183, 24350 MiB, [Not Found]
+
+[8] vLLM processes after stopping:
+279543 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 45213 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+
+============================================================
+✗ FAILURE: Some processes still running!
+  GPU processes: 1529183, 24350 MiB, [Not Found]
+  vLLM processes: 279543 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 45213 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+============================================================

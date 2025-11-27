@@ -289,7 +289,16 @@ class VLLMServer(FromParams):
             logger.info("Server is not running.")
             return
 
-        self.process.kill()
+        logger.info(f"Stopping vLLM server with PID {self.process.pid} on port {self.port}")
+        
+        # First, try to terminate gracefully
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning("Server did not terminate gracefully, killing...")
+            self.process.kill()
+        
         time.sleep(3)
 
         # Use pkill to kill processes matching the pattern
@@ -321,5 +330,12 @@ class VLLMServer(FromParams):
 
         # find_and_kill_process(self.port)
 
-        self.process.kill()
-        self.process.wait()
+        try:
+            self.process.kill()
+            self.process.wait(timeout=5)
+        except Exception as e:
+            logger.warning(f"Error during final kill: {e}")
+
+        # Wait for GPU memory to be released
+        time.sleep(5)
+        logger.info(f"vLLM server stopped on port {self.port}")

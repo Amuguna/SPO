@@ -1,0 +1,4 @@
+root      270132  0.0  0.0 128084 46768 ?        Sl   04:39   0:00 /bin/python3 /root/.vscode-server/extensions/ms-python.isort-2025.0.0/bundled/tool/lsp_server.py
+root      270133  0.1  0.0 1155772 206136 ?      Sl   04:39   0:01 /root/.vscode-server/cli/servers/Stable-7d842fb85a0275a4a8e4d7e040d2625abbf7f084/server/node /root/.vscode-server/extensions/ms-python.vscode-pylance-2025.9.1/dist/server.bundle.js --cancellationReceive=file:9a16f84d01da332f39e00e2662ca4693aee289c9ea --node-ipc --clientProcessId=1417
+root      279543  4.0  0.4 56057196 9127104 pts/1 Sl  04:48   0:15 python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-Math-7B --host 0.0.0.0 --port 45213 --seed 42 --swap-space 4 --dtype bfloat16 --gpu-memory-utilization 0.3 --max-num-seqs 16
+root      282266  0.0  0.0   4092  2036 pts/1    S+   04:54   0:00 grep --color=auto python
