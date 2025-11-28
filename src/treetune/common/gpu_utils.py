@@ -240,9 +240,58 @@ def wait_for_memory_release(target_gpu_index, threshold_mb=1024.0, max_tries=100
             logger.info(
                 f"GPU {target_gpu_index} memory used: {memory_usage[target_gpu_index]} MB. Waiting..."
             )
+            
+            # Every 20 tries, attempt to force cleanup ONLY of orphaned processes
+            if tries > 0 and tries % 20 == 0:
+                logger.warning(f"GPU memory not released after {tries} tries, attempting cleanup of orphaned processes...")
+                _force_cleanup_orphaned_vllm_processes(target_gpu_index)
+            
             time.sleep(2)
             tries += 1
 
     raise RuntimeError(
         f"GPU {target_gpu_index} memory usage is still above {threshold_mb} MB after {max_tries} tries."
     )
+
+
+def _force_cleanup_orphaned_vllm_processes(target_gpu_index):
+    """
+    Force cleanup of ONLY orphaned vLLM processes (those with ppid=1).
+    This is safe in distributed environments as it won't kill other processes' vLLM servers.
+    """
+    import psutil
+    
+    try:
+        # Clear CUDA cache first
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    except Exception as e:
+        logger.warning(f"Error clearing CUDA cache: {e}")
+    
+    try:
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+            try:
+                cmdline = proc.info.get('cmdline') or []
+                cmdline_str = ' '.join(cmdline) if cmdline else ''
+                ppid = proc.info.get('ppid', 0)
+                
+                # Only kill processes that:
+                # 1. Are vLLM spawn processes AND
+                # 2. Are orphaned (parent pid = 1, meaning their parent died)
+                is_vllm_spawn = 'from multiprocessing.spawn' in cmdline_str
+                is_orphaned = ppid == 1
+                
+                if is_vllm_spawn and is_orphaned:
+                    logger.info(f"Force killing orphaned vLLM process {proc.pid}: {cmdline_str[:80]}")
+                    proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+            except Exception as e:
+                logger.warning(f"Error killing process: {e}")
+                
+        time.sleep(2)
+        
+    except Exception as e:
+        logger.warning(f"Error in force cleanup: {e}")

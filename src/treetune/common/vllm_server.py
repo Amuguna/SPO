@@ -284,6 +284,45 @@ class VLLMServer(FromParams):
         else:
             self.process = subprocess.Popen(command)
 
+    def _kill_process_tree(self, pid: int):
+        """
+        Kill a process and all its children recursively.
+        This is necessary for vLLM 0.6+ which uses spawn multiprocessing.
+        """
+        try:
+            parent = psutil.Process(pid)
+            children = parent.children(recursive=True)
+            
+            # Kill children first
+            for child in children:
+                try:
+                    logger.info(f"Killing child process {child.pid} ({child.name()})")
+                    child.kill()
+                except psutil.NoSuchProcess:
+                    pass
+                except Exception as e:
+                    logger.warning(f"Error killing child process {child.pid}: {e}")
+            
+            # Then kill the parent
+            try:
+                parent.kill()
+            except psutil.NoSuchProcess:
+                pass
+            
+            # Wait for all processes to terminate
+            gone, alive = psutil.wait_procs(children + [parent], timeout=10)
+            for p in alive:
+                try:
+                    logger.warning(f"Process {p.pid} still alive, sending SIGKILL")
+                    p.kill()
+                except psutil.NoSuchProcess:
+                    pass
+                    
+        except psutil.NoSuchProcess:
+            logger.info(f"Process {pid} already terminated")
+        except Exception as e:
+            logger.warning(f"Error in _kill_process_tree: {e}")
+
     def stop_server(self):
         if self.process is None or self.process.poll() is not None:
             logger.info("Server is not running.")
@@ -291,50 +330,72 @@ class VLLMServer(FromParams):
 
         logger.info(f"Stopping vLLM server with PID {self.process.pid} on port {self.port}")
         
-        # First, try to terminate gracefully
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            logger.warning("Server did not terminate gracefully, killing...")
-            self.process.kill()
+        # Kill the entire process tree (important for vLLM 0.6+ with spawn multiprocessing)
+        self._kill_process_tree(self.process.pid)
         
         time.sleep(3)
 
-        # Use pkill to kill processes matching the pattern
+        # Use pkill to kill any remaining processes matching the pattern (only for THIS server's port)
         pattern = f"vllm.entrypoints.openai.api_server.*port {self.port}"
         try:
-            subprocess.run(["pkill", "-f", "-9", pattern])
+            subprocess.run(["pkill", "-f", "-9", pattern], capture_output=True)
         except subprocess.CalledProcessError as e:
             logger.error(f"An error occurred: {e}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-        while True:
+        # Kill only orphaned processes that belong to THIS server (identified by port)
+        # DO NOT kill processes from other servers in distributed environment
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+                try:
+                    cmdline = proc.info.get('cmdline') or []
+                    cmdline_str = ' '.join(cmdline) if cmdline else ''
+                    
+                    # Only kill processes that are:
+                    # 1. Related to THIS server's port, OR
+                    # 2. Children of our main process (already killed by _kill_process_tree, but double-check)
+                    is_this_server = f'--port {self.port}' in cmdline_str or f'port {self.port}' in cmdline_str
+                    
+                    if is_this_server:
+                        logger.info(f"Killing orphaned vLLM process {proc.pid}: {cmdline_str[:100]}")
+                        proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except Exception as e:
+            logger.warning(f"Error cleaning up orphaned processes: {e}")
+
+        # Wait and verify cleanup
+        max_retries = 10
+        for i in range(max_retries):
             try:
-                # Check if any process matches the pattern
                 result = subprocess.run(
                     ["pgrep", "-f", pattern], text=True, capture_output=True
                 )
-                if result.returncode == 0:
-                    logger.warning("Process has reappeared!")
-                    subprocess.run(["pkill", "-f", "-9", pattern])
-                else:
+                if result.returncode != 0:
                     break
-            except subprocess.CalledProcessError as e:
-                logger.error(f"An error occurred while checking the process: {e}")
+                logger.warning(f"Process still exists, retry {i+1}/{max_retries}")
+                subprocess.run(["pkill", "-f", "-9", pattern], capture_output=True)
             except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-
+                logger.error(f"Error during cleanup verification: {e}")
             time.sleep(1)
 
-        # find_and_kill_process(self.port)
-
+        # Final cleanup
         try:
-            self.process.kill()
-            self.process.wait(timeout=5)
+            if self.process.poll() is None:
+                self.process.kill()
+                self.process.wait(timeout=5)
         except Exception as e:
             logger.warning(f"Error during final kill: {e}")
+
+        # Clear CUDA cache to help release GPU memory
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except Exception as e:
+            logger.warning(f"Error clearing CUDA cache: {e}")
 
         # Wait for GPU memory to be released
         time.sleep(5)

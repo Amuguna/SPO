@@ -96,19 +96,38 @@ class MathEpisodeGeneratorWithMCAdvantages(MathEpisodeGenerator):
         vllm_cleanup_fn()
         release_memory()
         
-        # Wait for all processes to finish killing vLLM and for GPU memory to be released
+        # Wait for ALL processes to finish killing their vLLM servers
+        # This is critical - we must wait before any global cleanup
         self.distributed_state.wait_for_everyone()
         
-        # Extra safety: kill any remaining vLLM processes on this node (only main process does this)
+        # Now that ALL processes have killed their individual vLLM servers,
+        # the main process can do additional cleanup for any orphaned processes
         if self.distributed_state.is_local_main_process:
             import subprocess
+            import psutil
+            
+            # Only kill truly orphaned vLLM processes (those without a parent or with init as parent)
+            # DO NOT kill processes that might still be in use by other nodes
             try:
-                # Kill all vLLM API server processes
-                subprocess.run(["pkill", "-f", "-9", "vllm.entrypoints.openai.api_server"], 
-                             capture_output=True, timeout=10)
-                logger.info("Killed all remaining vLLM processes on this node")
+                for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'ppid']):
+                    try:
+                        cmdline = proc.info.get('cmdline') or []
+                        cmdline_str = ' '.join(cmdline) if cmdline else ''
+                        ppid = proc.info.get('ppid', 0)
+                        
+                        # Only kill if it's a vLLM spawn process and its parent is dead (ppid=1 means orphaned)
+                        is_vllm_spawn = 'from multiprocessing.spawn' in cmdline_str
+                        is_orphaned = ppid == 1
+                        
+                        if is_vllm_spawn and is_orphaned:
+                            logger.info(f"Killing orphaned vLLM spawn process {proc.pid}: {cmdline_str[:80]}")
+                            proc.kill()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
             except Exception as e:
-                logger.warning(f"Error killing vLLM processes: {e}")
+                logger.warning(f"Error cleaning up orphaned vLLM processes: {e}")
+            
+            logger.info("Cleaned up orphaned vLLM processes on this node")
         
         self.distributed_state.wait_for_everyone()
         
